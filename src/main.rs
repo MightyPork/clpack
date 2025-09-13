@@ -1,12 +1,10 @@
+use crate::action_init::{ClInit, cl_init};
 use crate::action_log::cl_log;
 use crate::action_pack::cl_pack;
 use crate::config::Config;
-use crate::store::Store;
 use anyhow::bail;
 use clap::builder::NonEmptyStringValueParser;
 use colored::Colorize;
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -16,6 +14,8 @@ mod git;
 
 mod action_log;
 mod action_pack;
+
+mod action_init;
 
 mod store;
 
@@ -65,6 +65,10 @@ fn main_try() -> anyhow::Result<()> {
         .subcommand(clap::Command::new("add")
             .visible_alias("log")
             .about("Add a changelog entry on the current branch"))
+        .subcommand(clap::Command::new("flush")
+            .about("Remove all changelog entries that were already released on all channels - clean up the changelog dir. Use e.g. when making a major release where all channel branches are merged."))
+        .subcommand(clap::Command::new("status")
+            .about("Show changelog entries currently waiting for release on the current channel"))
         .subcommand_required(false)
         .arg(clap::Arg::new("CONFIG")
             .short('c')
@@ -89,35 +93,14 @@ fn main_try() -> anyhow::Result<()> {
     let config_path = root.join(&config_file_name); // if absolute, it is replaced by it
 
     if let Some(("init", _)) = args.subcommand() {
-        let mut default_config = Config::default();
-
-        if !config_path.exists() {
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(&config_path)?;
-
-            println!("Creating clpack config file");
-            file.write_all(toml::to_string_pretty(&default_config)?.as_bytes())?;
-        } else {
-            println!("Loading existing config file: {}", config_path.display());
-            let file_text = std::fs::read_to_string(&config_path)?;
-            default_config = toml::from_str(&file_text)?;
-        }
-
-        let ctx = AppContext {
+        return cl_init(ClInit {
             binary_name,
-            config: default_config,
             root,
-        };
-        let _ = Store::new(&ctx, true)?;
-
-        println!("{}", "Changelog initialized.".green());
-        return Ok(());
+            config_path,
+        });
     }
 
     // Load and parse config
-
     let config: Config = if let Ok(config_file_content) = std::fs::read_to_string(&config_path) {
         match toml::from_str(&config_file_content) {
             Ok(config) => config,
