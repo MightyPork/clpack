@@ -1,106 +1,56 @@
 use crate::action_log::cl_log;
 use crate::action_pack::cl_pack;
+use crate::config::Config;
+use crate::store::Store;
+use anyhow::bail;
 use clap::builder::NonEmptyStringValueParser;
-use serde::{Deserialize, Serialize};
-use smart_default::SmartDefault;
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use colored::Colorize;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
 use std::process::exit;
+
+mod config;
 
 mod git;
 
 mod action_log;
 mod action_pack;
 
+mod store;
+
 #[derive(Debug)]
-struct AppContext {
-    config: Config,
+pub struct AppContext {
+    /// Name of the cl binary
+    pub binary_name: String,
 
-    root: PathBuf,
-}
+    /// Config loaded from file or defaults
+    pub config: Config,
 
-/// Main app configuration file
-#[derive(Debug, Serialize, Deserialize, SmartDefault)]
-#[serde(deny_unknown_fields, default)]
-struct Config {
-    /// Folder for data files - the tool will manage contents of this folder.
-    /// Changelog entries are simple text files that may be edited manually
-    /// if corrections need to be made.
-    #[default = "changelog"]
-    data_folder: String,
-
-    /// ID of the default channel - this only matters inside this config file
-    #[default = "default"]
-    default_channel: String,
-
-    /// Path or file name of the default changelog file, relative to the root of the project.
-    ///
-    /// The name is used as-is.
-    #[default = "CHANGELOG.md"]
-    changelog_file_default: String,
-
-    /// Path or file of a channel-specific changelog file, relative to the root of the project.
-    ///
-    /// Placeholders supported are:
-    /// - `{channel}`, `{Channel}`, `{CHANNEL}` - Channel ID in the respective capitalization
-    #[default = "CHANGELOG-{CHANNEL}.md"]
-    changelog_file_channel: String,
-
-    /// Changelog sections suggested when creating a new entry.
-    ///
-    /// Users may also specify a custom section name.
-    ///
-    /// Changelog entries under each section will be grouped in the packed changelog.
-    #[default(vec![
-        "New features".to_string(),
-        "Improvements".to_string(),
-        "Fixes".to_string(),
-    ])]
-    sections: Vec<String>,
-
-    /// Changelog channels - how to identify them from git branch names
-    ///
-    /// - Key - changelog ID; this can be used in the channel file name. Examples: default, eap, beta
-    /// - Value - git branch name to recognize the channel. This is a regex pattern.
-    ///
-    /// At least one channel must be defined, with the name defined in `default_channel`
-    ///
-    /// # Value format
-    /// For simple branch names without special symbols that do not change, e.g. `main`, `master`, `test`, you can just use the name as is.
-    /// To specify a regex, enclose it in slashes, e.g. /rel\/foo/
-    ///
-    /// If you have a naming schema like e.g. `beta/1.0` where only the prefix stays the same, you may use e.g. `^beta/.*`
-    #[default(HashMap::from([
-        ("default".to_string(), "/^(?:main|master)$/".to_string())
-    ]))]
-    channels: HashMap<String, String>,
-
-    /// Regex pattern to extract issue number from a branch name.
-    /// There should be one capture group that is the number.
-    ///
-    /// Example: `/^(SW-\d+)-.*$/` or  `/^(\d+)-.*$/`
-    ///
-    /// If None, no branch identification will be attempted.
-    #[default(Some(r"/^((?:SW-)?\d+)-.*/".to_string()))]
-    branch_issue_pattern: Option<String>,
-
-    /// Regex pattern to extract release number from a branch name.
-    /// There should be one capture group that is the version.
-    ///
-    /// Example: `/^rel\/(\d+.\d+)$/`
-    ///
-    /// If None, no branch identification will be attempted.
-    ///
-    /// TODO attempt to parse version from package.json, composer.json, Cargo.toml and others
-    #[default(Some(r"/^rel\/(\d+\.\d+)$/".to_string()))]
-    branch_version_pattern: Option<String>,
+    /// Root of the project
+    pub root: PathBuf,
 }
 
 fn main() {
-    let args = clap::Command::new("cl")
+    if let Err(e) = main_try() {
+        eprintln!("{}", e.to_string().red().bold());
+        exit(1);
+    }
+}
+
+fn main_try() -> anyhow::Result<()> {
+    let binary_name = std::env::current_exe()
+        .map(|p| p.file_name().map(|s| s.to_string_lossy().to_string()))
+        .ok()
+        .flatten()
+        .unwrap_or_else(|| "cl".to_string());
+
+    let args = clap::Command::new(&binary_name)
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
+        .subcommand(clap::Command::new("init")
+            .about("Create the changelog folder and the default config file in the current working directory, if they do not exist yet."))
         .subcommand(
             clap::Command::new("pack")
                 .visible_alias("release")
@@ -130,19 +80,41 @@ fn main() {
 
     let config_file_name: &str = specified_config_file.unwrap_or("clpack.toml");
 
-    eprintln!("Loading configuration from {}", config_file_name);
+    // eprintln!("Loading configuration from {}", config_file_name);
 
     let Ok(root) = std::env::current_dir() else {
-        eprintln!("Failed to get current directory - is it deleted / inaccessible?");
-        exit(1);
+        bail!("Failed to get current directory - is it deleted / inaccessible?");
     };
 
-    let config_path = if config_file_name.starts_with("/") {
-        // It's an absolute path
-        PathBuf::from(config_file_name)
-    } else {
-        root.join(&config_file_name)
-    };
+    let config_path = root.join(&config_file_name); // if absolute, it is replaced by it
+
+    if let Some(("init", _)) = args.subcommand() {
+        let mut default_config = Config::default();
+
+        if !config_path.exists() {
+            let mut file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .open(&config_path)?;
+
+            println!("Creating clpack config file");
+            file.write_all(toml::to_string_pretty(&default_config)?.as_bytes())?;
+        } else {
+            println!("Loading existing config file: {}", config_path.display());
+            let file_text = std::fs::read_to_string(&config_path)?;
+            default_config = toml::from_str(&file_text)?;
+        }
+
+        let ctx = AppContext {
+            binary_name,
+            config: default_config,
+            root,
+        };
+        let _ = Store::new(&ctx, true)?;
+
+        println!("{}", "Changelog initialized.".green());
+        return Ok(());
+    }
 
     // Load and parse config
 
@@ -150,34 +122,38 @@ fn main() {
         match toml::from_str(&config_file_content) {
             Ok(config) => config,
             Err(e) => {
-                eprintln!(
+                bail!(
                     "Failed to parse config file ({}): {}",
                     config_path.display(),
                     e
                 );
-                exit(1);
             }
         }
     } else if specified_config_file.is_some() {
         // Failed to load config the user specifically asked for - make it an error
-        eprintln!("Failed to load config file at {}", config_path.display());
-        exit(1);
+        bail!("Failed to load config file at {}", config_path.display());
     } else {
         Default::default()
     };
 
-    let ctx = AppContext { config, root };
+    let ctx = AppContext {
+        binary_name,
+        config,
+        root,
+    };
 
     // eprintln!("AppCtx: {:?}", ctx);
 
     match args.subcommand() {
         Some(("pack", subargs)) => {
             let manual_channel = subargs.get_one::<String>("CHANNEL");
-            cl_pack(ctx, manual_channel.map(String::as_str));
+            cl_pack(ctx, manual_channel.map(String::as_str))?;
         }
-        None | Some(("add", _)) => cl_log(ctx),
+        None | Some(("add", _)) => cl_log(ctx)?,
         Some((other, _)) => {
-            unimplemented!("Subcommand {other} is not implemented yet");
+            bail!("Subcommand {other} is not implemented yet");
         }
     }
+
+    Ok(())
 }

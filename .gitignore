@@ -1,2 +1,6 @@
 /target
 .idea/
+
+# Remove when the lib is stable enough and useful to keep our own changelog...
+changelog
+clpack.toml
