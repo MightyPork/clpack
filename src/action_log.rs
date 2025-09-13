@@ -98,6 +98,10 @@ pub(crate) fn cl_log(ctx: AppContext) -> anyhow::Result<()> {
         text = prefill_text;
     }
 
+    if !text.ends_with('\n') {
+        text.push('\n');
+    }
+
     store.create_entry(entry_name, text)?;
 
     println!("{}", "Done.".green());
