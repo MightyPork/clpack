@@ -16,6 +16,7 @@ regex = "1"
 anyhow = "1"
 colored = "3"
 faccess = "0.2"
+chrono = "0.4"
 
 # input
 

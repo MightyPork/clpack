@@ -1,5 +1,5 @@
 use crate::AppContext;
-use crate::config::{ChannelName, EntryName, VersionName};
+use crate::config::{ChannelName, Config, EntryName, VersionName};
 use anyhow::bail;
 use colored::Colorize;
 use faccess::PathExt;
@@ -92,8 +92,8 @@ impl<'a> Store<'a> {
 
     /// Check and create internal subdirs for the clpack system
     pub fn ensure_internal_subdirs_exist(&self) -> anyhow::Result<()> {
-        self.ensure_subdir_exists(DIR_ENTRIES)?;
-        self.ensure_subdir_exists(DIR_CHANNELS)?;
+        self.ensure_subdir_exists(DIR_ENTRIES, true)?;
+        self.ensure_subdir_exists(DIR_CHANNELS, false)?;
         // TODO
 
         Ok(())
@@ -102,7 +102,7 @@ impl<'a> Store<'a> {
     /// make sure a subdir exists, creating if needed.
     ///
     /// Note there is no lock so there can be a TOCTOU bug later if someone deletes the path - must be checked and handled.
-    fn ensure_subdir_exists(&self, name: &str) -> anyhow::Result<()> {
+    fn ensure_subdir_exists(&self, name: &str, gitkeep: bool) -> anyhow::Result<()> {
         let subdir = self.store_path.join(name);
 
         if !subdir.is_dir() {
@@ -120,7 +120,9 @@ impl<'a> Store<'a> {
             bail!("Changelog subdir is not writable: {}", subdir.display());
         }
 
-        std::fs::File::create(subdir.join(".gitkeep"))?;
+        if gitkeep {
+            std::fs::File::create(subdir.join(".gitkeep"))?;
+        }
 
         Ok(())
     }
@@ -157,12 +159,13 @@ impl<'a> Store<'a> {
 
     /// Create a release entry, write it to the releases buffer and to the file.
     pub fn create_release(&mut self, channel: ChannelName, release: Release) -> anyhow::Result<()> {
+        let rendered = self.render_release(&release)?;
+
         let Some(store) = self.versions.get_mut(&channel) else {
             bail!("Channel {channel} does not exist.");
         };
 
         let config = &self.ctx.config;
-        let rendered = release.render(self.store_path.join(DIR_ENTRIES), &config.sections)?;
 
         let changelog_file = self.ctx.root.join(
             if channel == config.default_channel {
@@ -209,6 +212,12 @@ impl<'a> Store<'a> {
         store.write_to_file()?;
         Ok(())
     }
+
+    /// Render a release
+    pub fn render_release(&self, release: &Release) -> anyhow::Result<String> {
+        let config = &self.ctx.config;
+        release.render(self.store_path.join(DIR_ENTRIES), &config)
+    }
 }
 
 /// Uppercase first char of a string
@@ -230,12 +239,8 @@ pub struct Release {
 }
 
 impl Release {
-    /// Render the entry into a Markdown fragment, using h2 (##) as the title.
-    pub fn render(
-        &self,
-        entries_dir: impl AsRef<Path>,
-        predefined_sections: &[String],
-    ) -> anyhow::Result<String> {
+    /// Render the entry into a Markdown fragment, using h2 (##) as the title, h3 (###) for sections
+    pub fn render(&self, entries_dir: impl AsRef<Path>, config: &Config) -> anyhow::Result<String> {
         let mut entries_per_section = HashMap::<String, String>::new();
         let entries_dir = entries_dir.as_ref();
         let unnamed = "".to_string();
@@ -256,6 +261,9 @@ impl Release {
             let mut current_section = unnamed.clone();
             for line in reader.lines() {
                 let line = line?;
+                if line.trim().is_empty() {
+                    continue;
+                }
                 if line.trim().starts_with('#') {
                     // It is a section name
                     let section = line.trim_matches(|c| c == '#' || c == ' ');
@@ -278,7 +286,7 @@ impl Release {
             reordered_sections.push(("".to_string(), unlabelled));
         }
 
-        for section_name in [unnamed].iter().chain(predefined_sections.iter()) {
+        for section_name in [unnamed].iter().chain(config.sections.iter()) {
             if let Some(content) = entries_per_section.remove(section_name) {
                 reordered_sections.push((section_name.clone(), content));
             }
@@ -288,14 +296,21 @@ impl Release {
             reordered_sections.push((section_name, content));
         }
 
-        let mut buffer = String::new();
+        let date = chrono::Local::now();
+        let mut buffer = format!(
+            "## {}\n",
+            config
+                .release_header
+                .replace("{VERSION}", &self.version)
+                .replace("{DATE}", &date.format(&config.date_format).to_string())
+        );
 
         for (section_name, content) in reordered_sections {
             if !section_name.is_empty() {
-                buffer.push_str(&format!("## {}\n", section_name));
+                buffer.push_str(&format!("\n### {}\n\n", section_name));
             }
-            buffer.push_str(&content);
-            buffer.push('\n');
+            buffer.push_str(content.trim_end());
+            buffer.push_str("\n\n");
         }
 
         Ok(buffer)
@@ -318,13 +333,18 @@ struct ChannelReleaseStore {
 impl ChannelReleaseStore {
     /// Load from a versions file
     fn load(releases_file: PathBuf, channel_name: ChannelName) -> anyhow::Result<Self> {
+        println!(
+            "Loading versions for channel {} from: {}",
+            channel_name,
+            releases_file.display()
+        );
         let releases = if !releases_file.exists() {
-            // File did not exist yet, create it
+            // File did not exist yet, create it - this catches error with write access early
             let mut f = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .open(&releases_file)?;
-            f.write_all("{}".as_bytes())?;
+            f.write_all("[]".as_bytes())?;
             Default::default()
         } else {
             let channel_json = read_to_string(&releases_file)?;
@@ -384,14 +404,16 @@ impl ChannelReleaseStore {
             })?;
 
             if !entry.metadata()?.is_file() || !fname.ends_with(".md") {
-                eprintln!(
-                    "{}",
-                    format!(
-                        "Unexpected item in changelog entries dir: {}",
-                        entry.path().display()
-                    )
-                    .yellow()
-                );
+                if fname != ".gitkeep" {
+                    eprintln!(
+                        "{}",
+                        format!(
+                            "Unexpected item in changelog entries dir: {}",
+                            entry.path().display()
+                        )
+                        .yellow()
+                    );
+                }
                 continue;
             }
 
@@ -404,7 +426,7 @@ impl ChannelReleaseStore {
                 .flatten()
                 .any(|entryname| entryname == basename)
             {
-                found.push(fname);
+                found.push(basename.to_string());
             }
         }
 

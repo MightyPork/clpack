@@ -1,7 +1,7 @@
 use crate::action_init::{ClInit, cl_init};
 use crate::action_log::cl_log;
 use crate::action_pack::cl_pack;
-use crate::config::Config;
+use crate::config::{ChannelName, Config};
 use anyhow::bail;
 use clap::builder::NonEmptyStringValueParser;
 use colored::Colorize;
@@ -33,7 +33,7 @@ pub struct AppContext {
 
 fn main() {
     if let Err(e) = main_try() {
-        eprintln!("{}", e.to_string().red().bold());
+        eprintln!("{}", format!("{:?}", e).red().bold());
         exit(1);
     }
 }
@@ -54,15 +54,20 @@ fn main_try() -> anyhow::Result<()> {
         .subcommand(
             clap::Command::new("pack")
                 .visible_alias("release")
-                .about("Pack changelog entries to a changelog section"),
+                .about("Pack changelog entries to a changelog section")
+                .arg(clap::Arg::new("CHANNEL")
+                    .short('x')
+                    .long("channel")
+                    .value_parser(NonEmptyStringValueParser::new())
+                    .required(false)),
         )
         .subcommand(clap::Command::new("add")
             .visible_alias("log")
             .about("Add a changelog entry on the current branch"))
-        .subcommand(clap::Command::new("flush")
-            .about("Remove all changelog entries that were already released on all channels - clean up the changelog dir. Use e.g. when making a major release where all channel branches are merged."))
-        .subcommand(clap::Command::new("status")
-            .about("Show changelog entries currently waiting for release on the current channel"))
+        // .subcommand(clap::Command::new("flush")
+        //     .about("Remove all changelog entries that were already released on all channels - clean up the changelog dir. Use e.g. when making a major release where all channel branches are merged."))
+        // .subcommand(clap::Command::new("status")
+        //     .about("Show changelog entries currently waiting for release on the current channel"))
         .subcommand_required(false)
         .arg(clap::Arg::new("CONFIG")
             .short('c')
@@ -122,8 +127,9 @@ fn main_try() -> anyhow::Result<()> {
     // eprintln!("AppCtx: {:?}", ctx);
 
     match args.subcommand() {
-        Some(("pack", _)) => {
-            cl_pack(ctx)?;
+        Some(("pack", subargs)) => {
+            let channel: Option<ChannelName> = subargs.get_one("CHANNEL").cloned();
+            cl_pack(ctx, channel)?;
         }
         None | Some(("add", _)) => cl_log(ctx)?,
         // TODO: status, flush

@@ -37,9 +37,18 @@ pub struct Config {
     /// - `{channel}`, `{Channel}`, `{CHANNEL}` - Channel ID in the respective capitalization
     #[default = "CHANGELOG-{CHANNEL}.md"]
     pub changelog_file_channel: String,
-    
+
+    /// Title of the changelog file, stripped and put back in front
     #[default = "# Changelog\n\n"]
     pub changelog_header: String,
+
+    /// Pattern for release header
+    #[default = "[{VERSION}] - {DATE}"]
+    pub release_header: String,
+
+    /// Date format (see patterns supported by the Chrono crate: https://docs.rs/chrono/latest/chrono/format/strftime/index.html )
+    #[default = "%Y-%m-%d"]
+    pub date_format: String,
 
     /// Changelog sections suggested when creating a new entry.
     ///

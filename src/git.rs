@@ -98,6 +98,10 @@ impl BranchName {
     /// Try to detect a release channel from this branch name (e.g. stable, EAP)
     pub fn parse_channel(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
         for (channel_id, template) in &ctx.config.channels {
+            if template.is_empty() {
+                // Channel only for manual choosing
+                continue;
+            }
             if let Some(pat_s) = as_regex_pattern(template) {
                 let pat = match regex::Regex::new(pat_s) {
                     Ok(pat) => pat,
