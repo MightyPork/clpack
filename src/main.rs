@@ -54,13 +54,7 @@ fn main_try() -> anyhow::Result<()> {
         .subcommand(
             clap::Command::new("pack")
                 .visible_alias("release")
-                .about("Create a release changelog entry for the current channel")
-                .arg(
-                    clap::Arg::new("CHANNEL")
-                        .help("Channel ID, possible values depend on project config. None for main channel.")
-                        .value_parser(NonEmptyStringValueParser::new())
-                        .required(false),
-                ),
+                .about("Pack changelog entries to a changelog section"),
         )
         .subcommand(clap::Command::new("add")
             .visible_alias("log")
@@ -128,11 +122,11 @@ fn main_try() -> anyhow::Result<()> {
     // eprintln!("AppCtx: {:?}", ctx);
 
     match args.subcommand() {
-        Some(("pack", subargs)) => {
-            let manual_channel = subargs.get_one::<String>("CHANNEL");
-            cl_pack(ctx, manual_channel.map(String::as_str))?;
+        Some(("pack", _)) => {
+            cl_pack(ctx)?;
         }
         None | Some(("add", _)) => cl_log(ctx)?,
+        // TODO: status, flush
         Some((other, _)) => {
             bail!("Subcommand {other} is not implemented yet");
         }

@@ -2,6 +2,15 @@ use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
 use std::collections::HashMap;
 
+/// e.g. default, stable, eap
+pub type ChannelName = String;
+
+/// e.g. 1.2.3
+pub type VersionName = String;
+
+/// e.g. SW-1234-stuff-is-broken (without .md)
+pub type EntryName = String;
+
 /// Main app configuration file
 #[derive(Debug, Serialize, Deserialize, SmartDefault)]
 #[serde(deny_unknown_fields, default)]
@@ -28,6 +37,9 @@ pub struct Config {
     /// - `{channel}`, `{Channel}`, `{CHANNEL}` - Channel ID in the respective capitalization
     #[default = "CHANGELOG-{CHANNEL}.md"]
     pub changelog_file_channel: String,
+    
+    #[default = "# Changelog\n\n"]
+    pub changelog_header: String,
 
     /// Changelog sections suggested when creating a new entry.
     ///
@@ -57,7 +69,7 @@ pub struct Config {
     #[default(HashMap::from([
         ("default".to_string(), "/^(?:main|master)$/".to_string())
     ]))]
-    pub channels: HashMap<String, String>,
+    pub channels: HashMap<ChannelName, String>,
 
     /// Regex pattern to extract issue number from a branch name.
     /// There should be one capture group that is the number.

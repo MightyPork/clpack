@@ -8,7 +8,6 @@ use colored::Colorize;
 /// Perform the action of adding a new log entry
 pub(crate) fn cl_log(ctx: AppContext) -> anyhow::Result<()> {
     let store = Store::new(&ctx, false)?;
-    store.ensure_internal_subdirs_exist()?;
 
     let branch = get_branch_name(&ctx);
     let issue = branch
