@@ -171,6 +171,7 @@ dependencies = [
  "clap",
  "colored",
  "faccess",
+ "indexmap",
  "inquire",
  "regex",
  "serde",
@@ -339,6 +340,7 @@ checksum = "206a8042aec68fa4a62e8d3f7aa4ceb508177d9324faf261e1959e495b7a1921"
 dependencies = [
  "equivalent",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]

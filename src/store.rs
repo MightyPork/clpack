@@ -5,10 +5,10 @@ use colored::Colorize;
 use faccess::PathExt;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::fs::{OpenOptions, read_to_string};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
+use indexmap::IndexMap;
 
 const DIR_ENTRIES: &str = "entries";
 const DIR_CHANNELS: &str = "channels";
@@ -20,7 +20,7 @@ pub struct Store<'a> {
     /// Path to the changelog directory
     store_path: PathBuf,
     /// Loaded version history for all channels
-    versions: HashMap<ChannelName, ChannelReleaseStore>,
+    versions: IndexMap<ChannelName, ChannelReleaseStore>,
 }
 
 impl<'a> Store<'a> {
@@ -51,7 +51,7 @@ impl<'a> Store<'a> {
         let mut store = Self {
             store_path,
             ctx,
-            versions: HashMap::new(),
+            versions: IndexMap::new(),
         };
 
         store.ensure_internal_subdirs_exist()?;
@@ -241,7 +241,7 @@ pub struct Release {
 impl Release {
     /// Render the entry into a Markdown fragment, using h2 (##) as the title, h3 (###) for sections
     pub fn render(&self, entries_dir: impl AsRef<Path>, config: &Config) -> anyhow::Result<String> {
-        let mut entries_per_section = HashMap::<String, String>::new();
+        let mut entries_per_section = IndexMap::<String, String>::new();
         let entries_dir = entries_dir.as_ref();
         let unnamed = "".to_string();
 
@@ -261,6 +261,7 @@ impl Release {
             let mut current_section = unnamed.clone();
             for line in reader.lines() {
                 let line = line?;
+                let line = line.trim_end();
                 if line.trim().is_empty() {
                     continue;
                 }
@@ -273,7 +274,7 @@ impl Release {
                         buffer.push('\n');
                         buffer.push_str(&line);
                     } else {
-                        entries_per_section.insert(current_section.clone(), line);
+                        entries_per_section.insert(current_section.clone(), line.to_string());
                     }
                 }
             }
@@ -282,12 +283,12 @@ impl Release {
         let mut reordered_sections = Vec::<(String, String)>::new();
 
         // First the unlabelled section (this is probably junk, but it was entered by the user, so keep it)
-        if let Some(unlabelled) = entries_per_section.remove("") {
+        if let Some(unlabelled) = entries_per_section.swap_remove("") {
             reordered_sections.push(("".to_string(), unlabelled));
         }
 
         for section_name in [unnamed].iter().chain(config.sections.iter()) {
-            if let Some(content) = entries_per_section.remove(section_name) {
+            if let Some(content) = entries_per_section.swap_remove(section_name) {
                 reordered_sections.push((section_name.clone(), content));
             }
         }

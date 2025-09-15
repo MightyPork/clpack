@@ -1,6 +1,6 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smart_default::SmartDefault;
-use std::collections::HashMap;
 
 /// e.g. default, stable, eap
 pub type ChannelName = String;
@@ -75,10 +75,10 @@ pub struct Config {
     /// To specify a regex, enclose it in slashes, e.g. /rel\/foo/
     ///
     /// If you have a naming schema like e.g. `beta/1.0` where only the prefix stays the same, you may use e.g. `^beta/.*`
-    #[default(HashMap::from([
+    #[default(IndexMap::from([
         ("default".to_string(), "/^(?:main|master)$/".to_string())
     ]))]
-    pub channels: HashMap<ChannelName, String>,
+    pub channels: IndexMap<ChannelName, String>,
 
     /// Regex pattern to extract issue number from a branch name.
     /// There should be one capture group that is the number.
