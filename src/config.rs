@@ -11,30 +11,35 @@ pub type VersionName = String;
 /// e.g. SW-1234-stuff-is-broken (without .md)
 pub type EntryName = String;
 
+pub const CONFIG_FILE_TEMPLATE: &str = include_str!("assets/config_file_template.toml");
+
+#[cfg(test)]
+#[test]
+fn test_template_file() {
+    // Check 1. that the example config is valid, and 2. that it matches the defaults in the struct
+    let parsed: Config = toml::from_str(CONFIG_FILE_TEMPLATE).unwrap();
+    let def = Config::default();
+    assert_eq!(parsed, def);
+}
+
 /// Main app configuration file
-#[derive(Debug, Serialize, Deserialize, SmartDefault)]
+#[derive(Debug, Serialize, Deserialize, SmartDefault, PartialEq, Clone)]
 #[serde(deny_unknown_fields, default)]
 pub struct Config {
-    /// Folder for data files - the tool will manage contents of this folder.
-    /// Changelog entries are simple text files that may be edited manually
-    /// if corrections need to be made.
+    /// Name / path of the folder managed by clpack
     #[default = "changelog"]
     pub data_folder: String,
 
-    /// ID of the default channel - this only matters inside this config file
+    /// ID of the default channel
     #[default = "default"]
     pub default_channel: String,
 
-    /// Path or file name of the default changelog file, relative to the root of the project.
-    ///
-    /// The name is used as-is.
+    /// Path or file name of the default changelog file, relative to project root (CWD)
     #[default = "CHANGELOG.md"]
     pub changelog_file_default: String,
 
-    /// Path or file of a channel-specific changelog file, relative to the root of the project.
-    ///
-    /// Placeholders supported are:
-    /// - `{channel}`, `{Channel}`, `{CHANNEL}` - Channel ID in the respective capitalization
+    /// Path or file of a channel-specific changelog file, relative to project root (CWD).
+    /// Supports placeholder `{channel}`, `{Channel}`, `{CHANNEL}`
     #[default = "CHANGELOG-{CHANNEL}.md"]
     pub changelog_file_channel: String,
 
@@ -51,10 +56,9 @@ pub struct Config {
     pub date_format: String,
 
     /// Changelog sections suggested when creating a new entry.
+    /// The order is maintained.
     ///
-    /// Users may also specify a custom section name.
-    ///
-    /// Changelog entries under each section will be grouped in the packed changelog.
+    /// Users may also specify custom section names when writing the changelog file.
     #[default(vec![
         "Fixes".to_string(),
         "Improvements".to_string(),
@@ -97,6 +101,6 @@ pub struct Config {
     /// If None, no branch identification will be attempted.
     ///
     /// TODO attempt to parse version from package.json, composer.json, Cargo.toml and others
-    #[default(Some(r"/^rel\/(\d+\.\d+)$/".to_string()))]
+    #[default(Some(r"/^rel\/([\d.]+)$/".to_string()))]
     pub branch_version_pattern: Option<String>,
 }

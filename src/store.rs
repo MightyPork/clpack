@@ -243,7 +243,7 @@ impl Release {
     pub fn render(&self, entries_dir: impl AsRef<Path>, config: &Config) -> anyhow::Result<String> {
         let mut entries_per_section = IndexMap::<String, String>::new();
         let entries_dir = entries_dir.as_ref();
-        let unnamed = "".to_string();
+        let unnamed_section = "".to_string();
 
         for entry in &self.entries {
             let entry_file = entries_dir.join(&format!("{entry}.md"));
@@ -258,17 +258,17 @@ impl Release {
             let file = OpenOptions::new().read(true).open(&entry_file)?;
             let reader = BufReader::new(file);
 
-            let mut current_section = unnamed.clone();
+            let mut current_section = unnamed_section.clone();
             for line in reader.lines() {
                 let line = line?;
                 let line = line.trim_end();
-                if line.trim().is_empty() {
+                let line_trimmed = line.trim();
+                if line_trimmed.is_empty() {
                     continue;
                 }
-                if line.trim().starts_with('#') {
+                if line_trimmed.starts_with('#') {
                     // It is a section name
-                    let section = line.trim_matches(|c| c == '#' || c == ' ');
-                    current_section = section.to_string();
+                    current_section = line.trim_start_matches(|c| c == '#' || c == ' ').to_string();
                 } else {
                     if let Some(buffer) = entries_per_section.get_mut(&current_section) {
                         buffer.push('\n');
@@ -287,7 +287,7 @@ impl Release {
             reordered_sections.push(("".to_string(), unlabelled));
         }
 
-        for section_name in [unnamed].iter().chain(config.sections.iter()) {
+        for section_name in [unnamed_section].iter().chain(config.sections.iter()) {
             if let Some(content) = entries_per_section.swap_remove(section_name) {
                 reordered_sections.push((section_name.clone(), content));
             }
@@ -311,7 +311,7 @@ impl Release {
                 buffer.push_str(&format!("\n### {}\n\n", section_name));
             }
             buffer.push_str(content.trim_end());
-            buffer.push_str("\n\n");
+            buffer.push_str("\n");
         }
 
         Ok(buffer)

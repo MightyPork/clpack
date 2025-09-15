@@ -29,7 +29,7 @@ pub fn cl_init(opts: ClInit) -> anyhow::Result<()> {
             "Creating clpack config file: {}",
             opts.config_path.display()
         );
-        file.write_all(toml::to_string_pretty(&default_config)?.as_bytes())?;
+        file.write_all(crate::config::CONFIG_FILE_TEMPLATE.as_bytes())?;
     } else {
         println!(
             "Loading existing config file: {}",

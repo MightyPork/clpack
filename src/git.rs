@@ -1,4 +1,5 @@
 use crate::AppContext;
+use crate::utils::empty_to_none::EmptyToNone;
 use anyhow::bail;
 use std::fmt::Display;
 use std::fmt::Formatter;
@@ -79,7 +80,7 @@ impl BranchName {
     ///
     /// Aborts if the configured regex pattern is invalid.
     pub fn parse_version(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
-        let Some(pat) = ctx.config.branch_version_pattern.as_ref() else {
+        let Some(pat) = ctx.config.branch_version_pattern.as_ref().empty_to_none() else {
             return Ok(None);
         };
         self.parse_using_regex(pat, "branch_version_pattern")
@@ -89,7 +90,7 @@ impl BranchName {
     ///
     /// Aborts if the configured regex pattern is invalid.
     pub fn parse_issue(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
-        let Some(pat) = ctx.config.branch_issue_pattern.as_ref() else {
+        let Some(pat) = ctx.config.branch_issue_pattern.as_ref().empty_to_none() else {
             return Ok(None);
         };
         self.parse_using_regex(pat, "branch_issue_pattern")

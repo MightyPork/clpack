@@ -1,4 +1,4 @@
-use crate::action_init::{ClInit, cl_init};
+use crate::action_init::{cl_init, ClInit};
 use crate::action_log::cl_log;
 use crate::action_pack::cl_pack;
 use crate::config::{ChannelName, Config};
@@ -18,6 +18,8 @@ mod action_pack;
 mod action_init;
 
 mod store;
+
+mod utils;
 
 #[derive(Debug)]
 pub struct AppContext {

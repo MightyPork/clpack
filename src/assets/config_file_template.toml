@@ -1,0 +1,78 @@
+# Configuration for clpack - changelog keeping utility
+# https://github.com/MightyPork/clpack
+#
+# To add a changelog entry manually, place it in a .md file in changelog/entries/
+
+# Folder for data files - clpack will manage contents of this folder.
+data_folder = "changelog"
+
+# ID of the default channel - this only matters inside this config file
+default_channel = "default"
+
+# Path or file name of the default changelog file, relative to the root of the project.
+#
+# The name is used as-is.
+changelog_file_default = "CHANGELOG.md"
+
+# Path or file of a channel-specific changelog file, relative to the root of the project.
+#
+# Placeholders supported are:
+# - `{channel}`, `{Channel}`, `{CHANNEL}` - Channel ID in the respective capitalization
+changelog_file_channel = "CHANGELOG-{CHANNEL}.md"
+
+# Title of the changelog file, stripped and put back in front when packing changelog entries
+changelog_header = '''
+# Changelog
+
+'''
+
+# Pattern for release header
+release_header = "[{VERSION}] - {DATE}"
+
+# Date format (strftime-based)
+#
+# For supported patterns, see https://docs.rs/chrono/latest/chrono/format/strftime/index.html
+date_format = "%Y-%m-%d"
+
+# Changelog sections suggested when creating a new entry.
+#
+# Users may also specify custom section names when writing the changelog file.
+#
+# Changelog entries under each section will be grouped in the packed changelog.
+sections = [
+    "Fixes",
+    "Improvements",
+    "New features",
+    "Internal",
+]
+
+# Regex pattern to extract issue number from a branch name.
+# There should be one capture group that is the number.
+#
+# If empty, no branch identification will be attempted.
+#
+# The default pattern matches 1234-gitlab-style and SW-1234-youtrack-style
+branch_issue_pattern = '/^((?:SW-)?\d+)-.*/'
+
+# Regex pattern to extract release number from a branch name.
+# There should be exactly one capture group that is the version.
+#
+# If empty, no branch identification will be attempted.
+#
+# The default pattern matches e.g. rel/1.2
+branch_version_pattern = '/^rel\/([\d.]+)$/'
+
+# Changelog channels & how to identify them from git branch names.
+# To add a new release channel, just add it here.
+# At least one channel must be defined - see the config option `default_channel`
+#
+# Format: key=value
+#
+# - key - changelog ID; this will be used in the channel file name. Examples: default, eap, beta
+# - value - git branch name to recognize the channel. This is a regex pattern.
+#
+# For simple branch names, e.g. `main`, `master`, `test`, write the name simply as string.
+#
+# To specify a regex pattern (wildcard name), enclose it in slashes, e.g. '/^release\//'
+[channels]
+default = '/^(?:main|master)$/'
