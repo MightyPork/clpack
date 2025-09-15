@@ -1,17 +1,25 @@
 use crate::AppContext;
 use crate::config::{ChannelName, Config, EntryName, VersionName};
-use anyhow::bail;
+use anyhow::{Context, bail};
 use colored::Colorize;
 use faccess::PathExt;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::fs::{OpenOptions, read_to_string};
+use std::fs::{File, OpenOptions, read_to_string};
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use indexmap::IndexMap;
 
 const DIR_ENTRIES: &str = "entries";
 const DIR_CHANNELS: &str = "channels";
+
+const SUPPORTED_FORMAT_VERSION: usize = 1;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct Manifest {
+    /// Versionm of the format
+    format_version: usize,
+}
 
 /// Changelog store struct
 pub struct Store<'a> {
@@ -30,8 +38,8 @@ impl<'a> Store<'a> {
         if !store_path.is_dir() {
             if init {
                 // Try to create it
-                eprintln!("Creating changelog dir: {}", store_path.display());
-                std::fs::create_dir_all(&store_path)?;
+                std::fs::create_dir_all(&store_path)
+                    .with_context(|| format!("Creating changelog dir: {}", store_path.display()))?;
             } else {
                 bail!(
                     "Changelog directory does not exist: {}. Use `{} init` to create it.",
@@ -46,6 +54,43 @@ impl<'a> Store<'a> {
                 "Changelog directory is not writable: {}",
                 store_path.display()
             );
+        }
+
+        let manifest_path = store_path.join("manifest.json");
+        if manifest_path.is_file() {
+            let manifest_file = OpenOptions::new()
+                .read(true)
+                .open(&manifest_path)
+                .with_context(|| format!("Opening manifest file: {}", manifest_path.display()))?;
+
+            let manifest: Manifest = serde_json::from_reader(manifest_file)
+                .with_context(|| format!("Reading manifest file: {}", manifest_path.display()))?;
+
+            if manifest.format_version != 1 {
+                bail!(
+                    "clpack store is in format {}. This version of clpack requires format {}",
+                    manifest.format_version,
+                    SUPPORTED_FORMAT_VERSION
+                );
+            }
+        } else {
+            println!("Creating clpack manifest file: {}", manifest_path.display());
+            let manifest_file = OpenOptions::new()
+                .create_new(true)
+                .write(true)
+                .open(&manifest_path)
+                .with_context(|| {
+                    format!(
+                        "Opening manifest file for writing: {}",
+                        manifest_path.display()
+                    )
+                })?;
+
+            let manifest = Manifest {
+                format_version: SUPPORTED_FORMAT_VERSION,
+            };
+            serde_json::to_writer_pretty(manifest_file, &manifest)
+                .with_context(|| format!("Writing manifest file: {}", manifest_path.display()))?;
         }
 
         let mut store = Self {
@@ -71,8 +116,7 @@ impl<'a> Store<'a> {
     /// Check if a changelog entry exists. Filename is passed without extension.
     /// This only checks within the current epoch as older files are no longer present.
     pub fn entry_exists(&self, name: &str) -> bool {
-        let path = self.make_entry_path(name);
-        path.exists()
+        self.make_entry_path(name).exists()
     }
 
     /// Load release lists for all channels
@@ -112,8 +156,8 @@ impl<'a> Store<'a> {
                     subdir.display()
                 );
             }
-            eprintln!("Creating changelog subdir: {}", subdir.display());
-            std::fs::create_dir_all(&subdir)?;
+            std::fs::create_dir_all(&subdir)
+                .with_context(|| format!("Creating subdir: {}", subdir.display()))?;
         }
 
         if !subdir.writable() {
@@ -121,7 +165,7 @@ impl<'a> Store<'a> {
         }
 
         if gitkeep {
-            std::fs::File::create(subdir.join(".gitkeep"))?;
+            File::create(subdir.join(".gitkeep"))?;
         }
 
         Ok(())
@@ -132,9 +176,10 @@ impl<'a> Store<'a> {
         let path = self.make_entry_path(name.as_str());
         let mut file = OpenOptions::new().write(true).create(true).open(&path)?;
 
-        eprintln!("Writing changelog entry to file: {}", path.display());
+        println!("Writing changelog entry to file: {}", path.display());
 
-        file.write_all(content.as_bytes())?;
+        file.write_all(content.as_bytes())
+            .with_context(|| format!("Writing file {}", path.display()))?;
         Ok(())
     }
 
@@ -268,7 +313,9 @@ impl Release {
                 }
                 if line_trimmed.starts_with('#') {
                     // It is a section name
-                    current_section = line.trim_start_matches(|c| c == '#' || c == ' ').to_string();
+                    current_section = line
+                        .trim_start_matches(|c| c == '#' || c == ' ')
+                        .to_string();
                 } else {
                     if let Some(buffer) = entries_per_section.get_mut(&current_section) {
                         buffer.push('\n');
@@ -308,12 +355,13 @@ impl Release {
 
         for (section_name, content) in reordered_sections {
             if !section_name.is_empty() {
-                buffer.push_str(&format!("\n### {}\n\n", section_name));
+                buffer.push_str(&format!("\n### {}\n", section_name));
             }
             buffer.push_str(content.trim_end());
             buffer.push_str("\n");
         }
 
+        buffer.push_str("\n");
         Ok(buffer)
     }
 }

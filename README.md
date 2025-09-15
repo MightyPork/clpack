@@ -10,10 +10,11 @@ This tool aims to make change logging as streamlined as possible to encourage de
 automatically for every bugfix and feature. This can be enforced as part of a CI pipeline.
 
 The entry format is kept simple and readable, so entries can be added manually as well - e.g. if some 
-contributors can't or don't want to use this tool.
+contributors can't or don't want to use this tool. The generated CHANGELOG.md file can be freely edited after clpack
+updates it - just keep the header unchanged. 
 
-_The tool is meant to be used with Git, but it is not required - it's just more convenient, 
-as it can pre-fill some information from branch names._
+_clpack is meant to be used with Git, where it can pick up information from branch names. Git is, however, optional. 
+You can use this tool with other VCS or none at all._
 
 ## Advantages over keeping the changelog manually
 
