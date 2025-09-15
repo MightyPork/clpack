@@ -1,13 +1,12 @@
 [package]
 name = "clpack"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2024"
 authors = ["Ondřej Hruška <ondra@ondrovo.com>"]
 description = "Manage changelog across multiple release channels"
 
 [dependencies]
 clap = { version = "4.5", features = ["string"] }
-thiserror = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.9"
@@ -18,8 +17,4 @@ colored = "3"
 faccess = "0.2"
 chrono = "0.4"
 indexmap = { version = "2.11", features = ["serde"] }
-
-# input
-
-# sadly this looks mostly abandoned. Alternative is "dialoguer"
-inquire = { version = "0.7.5", features = ["editor"] }
+inquire = { version = "0.8.0", features = ["editor"] }
