@@ -24,6 +24,9 @@ mod store;
 
 mod utils;
 
+#[cfg(feature = "youtrack")]
+mod youtrack;
+
 #[derive(Debug)]
 pub struct AppContext {
     /// Name of the cl binary
