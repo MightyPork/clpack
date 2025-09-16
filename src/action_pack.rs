@@ -1,21 +1,56 @@
 use crate::AppContext;
 use crate::config::ChannelName;
-use crate::git::get_branch_name;
+use crate::git::{BranchName, get_branch_name};
 use crate::store::{Release, Store};
 use anyhow::bail;
 use colored::Colorize;
 
-/// Perform the action of packing changelog entries for a release
-pub(crate) fn cl_pack(ctx: AppContext, channel: Option<ChannelName>) -> anyhow::Result<()> {
-    let mut store = Store::new(&ctx, false)?;
-    let branch = get_branch_name(&ctx);
+pub fn pack_resolve_and_show_preview(
+    ctx: &AppContext,
+    user_chosen_channel: Option<ChannelName>,
+    branch: Option<&BranchName>,
+) -> anyhow::Result<Option<(Release, ChannelName)>> {
+    let channel = resolve_channel(&ctx, user_chosen_channel, branch)?;
+    let store = Store::new(&ctx, false)?;
 
-    let (channel_detected, channel_explicit) = match channel {
+    let unreleased = store.find_unreleased_changes(&channel)?;
+
+    if unreleased.is_empty() {
+        eprintln!("No unreleased changes.");
+        return Ok(None);
+    }
+
+    println!();
+    println!("Changes waiting for release:");
+    for entry in &unreleased {
+        println!("+ {}", entry.cyan());
+    }
+    println!();
+
+    let release = Release {
+        version: "Unreleased".to_string(),
+        entries: unreleased,
+    };
+
+    let rendered = store.render_release(&release)?;
+
+    println!("\nPreview:\n\n{}", rendered);
+
+    Ok(Some((release, channel)))
+}
+
+/// Resolve channel from current branch or other context info, ask if needed
+fn resolve_channel(
+    ctx: &AppContext,
+    user_chosen_channel: Option<ChannelName>,
+    branch: Option<&BranchName>,
+) -> anyhow::Result<ChannelName> {
+    let (channel_detected, channel_explicit) = match user_chosen_channel {
         Some(ch) => (Some(ch), true), // passed via flag already
         None => (
             branch
                 .as_ref()
-                .map(|b| b.parse_channel(&ctx))
+                .map(|b| b.parse_channel(ctx))
                 .transpose()?
                 .flatten(),
             false,
@@ -27,22 +62,6 @@ pub(crate) fn cl_pack(ctx: AppContext, channel: Option<ChannelName>) -> anyhow::
     {
         bail!("No such channel: {ch}");
     }
-
-    // If the branch is named rel/3.40, this can extract 3.40.
-    // TODO try to get something better from git!
-    let version_base = branch
-        .as_ref()
-        .map(|b| b.parse_version(&ctx))
-        .transpose()?
-        .flatten();
-
-    // TODO detect version from git query?
-
-    // TODO remove this
-    eprintln!(
-        "Branch name: {:?}, channel: {:?}, version: {:?}",
-        branch, channel_detected, version_base
-    );
 
     // Ask for the channel
     let channel = if ctx.config.channels.len() > 1 {
@@ -66,19 +85,31 @@ pub(crate) fn cl_pack(ctx: AppContext, channel: Option<ChannelName>) -> anyhow::
     };
     println!("Channel: {}", channel.green().bold());
 
-    let unreleased = store.find_unreleased_changes(&channel)?;
+    Ok(channel)
+}
 
-    if unreleased.is_empty() {
-        eprintln!("No unreleased changes.");
+/// Perform the action of packing changelog entries for a release
+pub(crate) fn cl_pack(
+    ctx: AppContext,
+    user_chosen_channel: Option<ChannelName>,
+) -> anyhow::Result<()> {
+    let branch = get_branch_name(&ctx);
+    let Some((mut release, channel)) =
+        pack_resolve_and_show_preview(&ctx, user_chosen_channel, branch.as_ref())?
+    else {
+        // No changes
         return Ok(());
-    }
+    };
 
-    println!();
-    println!("Changes waiting for release:");
-    for entry in &unreleased {
-        println!("+ {}", entry.cyan());
-    }
-    println!();
+    let mut store = Store::new(&ctx, false)?;
+
+    // If the branch is named rel/3.40, this can extract 3.40.
+    // TODO try to get something better from git!
+    let version_base = branch
+        .as_ref()
+        .map(|b| b.parse_version(&ctx))
+        .transpose()?
+        .flatten();
 
     // Ask for the version
     let mut version = version_base.unwrap_or_default();
@@ -99,14 +130,7 @@ pub(crate) fn cl_pack(ctx: AppContext, channel: Option<ChannelName>) -> anyhow::
         }
     }
 
-    let release = Release {
-        version,
-        entries: unreleased,
-    };
-
-    let rendered = store.render_release(&release)?;
-
-    println!("\n\nPreview:\n\n{}\n", rendered);
+    release.version = version;
 
     if !inquire::Confirm::new("Continue - write to changelog file?")
         .with_default(true)

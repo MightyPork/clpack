@@ -1,6 +1,7 @@
-use crate::action_init::{cl_init, ClInit};
+use crate::action_init::{ClInit, cl_init};
 use crate::action_log::cl_log;
 use crate::action_pack::cl_pack;
+use crate::action_status::cl_status;
 use crate::config::{ChannelName, Config};
 use anyhow::bail;
 use clap::builder::NonEmptyStringValueParser;
@@ -16,6 +17,8 @@ mod action_log;
 mod action_pack;
 
 mod action_init;
+
+mod action_status;
 
 mod store;
 
@@ -47,6 +50,12 @@ fn main_try() -> anyhow::Result<()> {
         .flatten()
         .unwrap_or_else(|| "cl".to_string());
 
+    let optional_channel_arg = clap::Arg::new("CHANNEL")
+        .short('x')
+        .long("channel")
+        .value_parser(NonEmptyStringValueParser::new())
+        .required(false);
+
     let args = clap::Command::new(&binary_name)
         .version(env!("CARGO_PKG_VERSION"))
         .author(env!("CARGO_PKG_AUTHORS"))
@@ -57,11 +66,12 @@ fn main_try() -> anyhow::Result<()> {
             clap::Command::new("pack")
                 .visible_alias("release")
                 .about("Pack changelog entries to a changelog section")
-                .arg(clap::Arg::new("CHANNEL")
-                    .short('x')
-                    .long("channel")
-                    .value_parser(NonEmptyStringValueParser::new())
-                    .required(false)),
+                .arg(optional_channel_arg.clone()),
+        )
+        .subcommand(
+            clap::Command::new("status")
+                .about("Show outstanding change entries on the current channel (or specified channel)")
+                .arg(optional_channel_arg),
         )
         .subcommand(clap::Command::new("add")
             .visible_alias("log")
@@ -132,6 +142,10 @@ fn main_try() -> anyhow::Result<()> {
         Some(("pack", subargs)) => {
             let channel: Option<ChannelName> = subargs.get_one("CHANNEL").cloned();
             cl_pack(ctx, channel)?;
+        }
+        Some(("status", subargs)) => {
+            let channel: Option<ChannelName> = subargs.get_one("CHANNEL").cloned();
+            cl_status(ctx, channel)?;
         }
         None | Some(("add", _)) => cl_log(ctx)?,
         // TODO: status, flush
