@@ -382,22 +382,32 @@ struct ChannelReleaseStore {
 impl ChannelReleaseStore {
     /// Load from a versions file
     fn load(releases_file: PathBuf, channel_name: ChannelName) -> anyhow::Result<Self> {
-        println!(
-            "Loading versions for channel {} from: {}",
-            channel_name,
-            releases_file.display()
-        );
         let releases = if !releases_file.exists() {
             // File did not exist yet, create it - this catches error with write access early
             let mut f = OpenOptions::new()
                 .write(true)
                 .create(true)
-                .open(&releases_file)?;
-            f.write_all("[]".as_bytes())?;
+                .open(&releases_file)
+                .with_context(|| {
+                    format!("Failed to open channel file: {}", releases_file.display())
+                })?;
+            f.write_all("[]".as_bytes()).with_context(|| {
+                format!(
+                    "Failed to write into channel file: {}",
+                    releases_file.display()
+                )
+            })?;
             Default::default()
         } else {
-            let channel_json = read_to_string(&releases_file)?;
-            serde_json::from_str::<ReleaseList>(&channel_json)?
+            let channel_json = read_to_string(&releases_file).with_context(|| {
+                format!("Failed to read channel file: {}", releases_file.display())
+            })?;
+            serde_json::from_str::<ReleaseList>(&channel_json).with_context(|| {
+                format!(
+                    "Failed to parse content of channel file: {}",
+                    releases_file.display()
+                )
+            })?
         };
 
         Ok(Self {
