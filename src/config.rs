@@ -13,6 +13,10 @@ pub type EntryName = String;
 
 pub const CONFIG_FILE_TEMPLATE: &str = include_str!("assets/config_file_template.toml");
 
+pub const ENV_YOUTRACK_URL : &str = "CLPACK_YOUTRACK_URL";
+
+pub const ENV_YOUTRACK_TOKEN : &str = "CLPACK_YOUTRACK_TOKEN";
+
 #[cfg(test)]
 #[test]
 fn test_template_file() {

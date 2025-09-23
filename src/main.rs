@@ -24,8 +24,7 @@ mod store;
 
 mod utils;
 
-#[cfg(feature = "youtrack")]
-mod youtrack;
+mod integrations;
 
 #[derive(Debug)]
 pub struct AppContext {
