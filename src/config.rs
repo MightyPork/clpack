@@ -145,4 +145,7 @@ pub struct YouTrackIntegrationConfig {
 
     /// Name of the version field (Available in version)
     pub version_field: Option<String>,
+
+    /// Version prefix
+    pub version_prefix: String,
 }

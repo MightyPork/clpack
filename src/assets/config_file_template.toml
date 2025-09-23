@@ -78,8 +78,8 @@ branch_version_pattern = '/^rel\/([\d.]+)$/'
 default = '/^(?:main|master)$/'
 
 [integrations.youtrack]
-# When creating a release, clpack can mark the included issues
-# as "Released" and record the versions into YouTrack.
+# When creating a release, clpack can mark the included issues as "Released" and record
+# the versions into YouTrack.
 #
 # clpack will ask for confirmation before doing this.
 #
@@ -102,7 +102,7 @@ enabled = false
 # YouTrack server URL. Can be changed locally by setting env var CLPACK_YOUTRACK_URL
 url = "https://example.youtrack.cloud"
 
-# Channels filter - release on those channels will trigger the  YouTrack integration
+# Channels filter - release on those channels will trigger the YouTrack integration
 # (i.e. don't mark as Released if it's only in beta)
 channels = [
     "default"
@@ -115,3 +115,7 @@ channels = [
 # Change a custom version field of the released issues.
 # Uncomment to enable, change to fit your project
 #version_field = "Available in version"
+
+# If multiple logical projects are tracked in the same YouTrack project, versions may beed namespacing.
+# This prefix is added to versions as fetched/created in YouTrack
+#version_prefix = ""

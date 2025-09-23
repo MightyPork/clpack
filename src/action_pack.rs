@@ -1,12 +1,11 @@
 use crate::AppContext;
-use crate::config::{ChannelName, ENV_YOUTRACK_TOKEN, ENV_YOUTRACK_URL};
+use crate::config::ChannelName;
 use crate::git::{BranchName, get_branch_name};
 use crate::integrations::youtrack::{
-    YouTrackClient, youtrack_integration_enabled, youtrack_integration_on_release,
+    youtrack_integration_enabled, youtrack_integration_on_release,
 };
 use crate::store::{Release, Store};
-use crate::utils::empty_to_none::EmptyToNone;
-use anyhow::{Context, bail};
+use anyhow::bail;
 use colored::Colorize;
 
 pub fn pack_resolve_and_show_preview(

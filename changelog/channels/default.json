@@ -4,5 +4,12 @@
     "entries": [
       "stable release"
     ]
+  },
+  {
+    "version": "1.1.0",
+    "entries": [
+      "SW-4712-clpack-youtrack-integration",
+      "SW-4716-add-cl-status"
+    ]
   }
 ]

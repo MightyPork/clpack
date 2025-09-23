@@ -116,3 +116,7 @@ released_state = "Released"
 # Change a custom version field of the released issues.
 # Uncomment to enable, change to fit your project
 version_field = "Available in version"
+
+# If multiple logical projects are tracked in the same YouTrack project, versions may beed namespacing.
+# This prefix is added to versions when creating them in YouTrack
+version_prefix = "clpack-"

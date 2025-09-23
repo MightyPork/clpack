@@ -39,6 +39,8 @@ pub struct AppContext {
 }
 
 fn main() {
+    env_logger::init();
+
     if let Err(e) = main_try() {
         eprintln!("{}", format!("{:?}", e).red().bold());
         exit(1);

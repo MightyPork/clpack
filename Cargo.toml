@@ -1,6 +1,6 @@
 [package]
 name = "clpack"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2024"
 authors = ["Ondřej Hruška <ondra@ondrovo.com>"]
 description = "Manage changelog across multiple release channels"
@@ -24,6 +24,8 @@ inquire = { version = "0.9", features = ["editor"] }
 reqwest = { version = "0.12", features = ["rustls-tls", "blocking"] } #, optional = true
 json_dotpath = "1.1.0"
 dotenv = "0.15.0"
+
+env_logger = "0.11.8"
 
 [dev-dependencies]
 simple-logging = "2"

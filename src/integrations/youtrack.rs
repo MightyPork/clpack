@@ -52,6 +52,9 @@ pub fn youtrack_integration_on_release(
     let client = YouTrackClient::new(url, &token)?;
 
     let mut project_id_opt = None;
+    let mut set_version_opt = None;
+
+    let prefixed_version = format!("{}{}", ytconf.version_prefix, release.version);
 
     let date = chrono::Utc::now();
     for entry in release.entries {
@@ -77,11 +80,12 @@ pub fn youtrack_integration_on_release(
 
         let project_id = project_id_opt.as_ref().unwrap(); // We know it is set now
 
-        let mut set_version_opt = None;
-        if let Some(field) = &ytconf.version_field {
+        if let Some(field) = &ytconf.version_field
+            && set_version_opt.is_none()
+        {
             let set_version = SetVersion {
                 field_name: field,
-                version: &release.version,
+                version: &prefixed_version,
             };
 
             client.ensure_version_exists_in_project(&project_id, &set_version, Some(date))?;
@@ -281,7 +285,7 @@ impl YouTrackClient {
         }
 
         // Got something?
-        let Some((field_id, bundle_id)) = field_bundle else {
+        let Some((_field_id, bundle_id)) = field_bundle else {
             bail!(
                 "YouTrack version field {field_name} not found in the project {project_id}",
                 field_name = version_info.field_name
@@ -293,6 +297,7 @@ impl YouTrackClient {
         #[derive(Deserialize)]
         struct YTVersion {
             name: VersionName,
+            #[allow(unused)]
             id: String,
         }
 
@@ -335,6 +340,7 @@ impl YouTrackClient {
 
         #[derive(Deserialize, Debug)]
         #[allow(non_snake_case)]
+        #[allow(unused)]
         struct CreateVersionResponse {
             releaseDate: Option<i64>,
             released: bool,
@@ -457,6 +463,7 @@ mod tests {
     use log::{LevelFilter, debug};
 
     // #[test] // Disabled
+    #[allow(unused)]
     fn test_youtrack_communication() {
         simple_logging::log_to_stderr(LevelFilter::Debug);
 
