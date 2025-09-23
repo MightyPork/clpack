@@ -11,7 +11,15 @@ pub type VersionName = String;
 /// e.g. SW-1234-stuff-is-broken (without .md)
 pub type EntryName = String;
 
+/// Config file with nice comments
 pub const CONFIG_FILE_TEMPLATE: &str = include_str!("assets/config_file_template.toml");
+
+/// ENV / dotenv key for the youtrack integration server URL
+/// This is only for unit tests
+pub const ENV_YOUTRACK_URL: &str = "CLPACK_YOUTRACK_URL";
+
+/// ENV / dotenv key for the youtrack integration API token
+pub const ENV_YOUTRACK_TOKEN: &str = "CLPACK_YOUTRACK_TOKEN";
 
 #[cfg(test)]
 #[test]
@@ -103,4 +111,38 @@ pub struct Config {
     /// TODO attempt to parse version from package.json, composer.json, Cargo.toml and others
     #[default(Some(r"/^rel\/([\d.]+)$/".to_string()))]
     pub branch_version_pattern: Option<String>,
+
+    /// Integrations config
+    pub integrations: IntegrationsConfig,
+}
+
+/// Integrations config
+#[derive(Debug, Serialize, Deserialize, SmartDefault, PartialEq, Clone)]
+#[serde(deny_unknown_fields, default)]
+pub struct IntegrationsConfig {
+    /// YouTrack integration
+    pub youtrack: YouTrackIntegrationConfig,
+}
+
+#[derive(Debug, Serialize, Deserialize, SmartDefault, PartialEq, Clone)]
+#[serde(deny_unknown_fields, default)]
+pub struct YouTrackIntegrationConfig {
+    /// Enable the integration
+    pub enabled: bool,
+
+    /// URL of the youtrack server (just https://domain)
+    #[default = "https://example.youtrack.cloud"]
+    pub url: String,
+
+    /// Channels filter
+    #[default(vec![
+        "default".to_string(),
+    ])]
+    pub channels: Vec<ChannelName>,
+
+    /// Name of the State option to switch to when generating changelog (e.g. Released)
+    pub released_state: Option<String>,
+
+    /// Name of the version field (Available in version)
+    pub version_field: Option<String>,
 }

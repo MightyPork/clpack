@@ -24,6 +24,8 @@ mod store;
 
 mod utils;
 
+mod integrations;
+
 #[derive(Debug)]
 pub struct AppContext {
     /// Name of the cl binary

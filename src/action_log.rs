@@ -12,7 +12,7 @@ pub(crate) fn cl_log(ctx: AppContext) -> anyhow::Result<()> {
     let branch = get_branch_name(&ctx);
     let issue = branch
         .as_ref()
-        .map(|b| b.parse_issue(&ctx))
+        .map(|b| b.parse_issue(&ctx.config))
         .transpose()?
         .flatten();
 
