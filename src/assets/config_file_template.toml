@@ -76,3 +76,42 @@ branch_version_pattern = '/^rel\/([\d.]+)$/'
 # To specify a regex pattern (wildcard name), enclose it in slashes, e.g. '/^release\//'
 [channels]
 default = '/^(?:main|master)$/'
+
+[integrations.youtrack]
+# When creating a release, clpack can mark the included issues
+# as "Released" and record the versions into YouTrack.
+#
+# clpack will ask for confirmation before doing this.
+#
+# Requirements:
+#
+# This integration only works if your changelog entry file names (by default taken from branch names)
+# contain the issue numbers - e.g. SW-1234-added-stuff.md. If the issue number can't be recognized,
+# the entry will be skipped.
+#
+# You must not combine multiple tickets into one file if you want the numbers to be found
+# - the file content is not parsed by this integration.
+#
+# Each developer who wants to use this integration when packing changelog must set their YouTrack
+# API token in an env variable CLPACK_YOUTRACK_TOKEN (in their environment or in an .env file).
+# It is also possible to change the server URL by setting CLPACK_YOUTRACK_URL, if needed.
+
+# Enable the YouTrack integration
+enabled = false
+
+# YouTrack server URL. Can be changed locally by setting env var CLPACK_YOUTRACK_URL
+url = "https://example.youtrack.cloud"
+
+# Channels filter - release on those channels will trigger the  YouTrack integration
+# (i.e. don't mark as Released if it's only in beta)
+channels = [
+    "default"
+]
+
+# Change the "State" field of the released issues.
+# Uncomment to enable, change to fit your project
+#released_state = "Released"
+
+# Change a custom version field of the released issues.
+# Uncomment to enable, change to fit your project
+#version_field = "Available in version"

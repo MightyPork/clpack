@@ -1,8 +1,12 @@
 use crate::AppContext;
-use crate::config::ChannelName;
+use crate::config::{ChannelName, ENV_YOUTRACK_TOKEN, ENV_YOUTRACK_URL};
 use crate::git::{BranchName, get_branch_name};
+use crate::integrations::youtrack::{
+    YouTrackClient, youtrack_integration_enabled, youtrack_integration_on_release,
+};
 use crate::store::{Release, Store};
-use anyhow::bail;
+use crate::utils::empty_to_none::EmptyToNone;
+use anyhow::{Context, bail};
 use colored::Colorize;
 
 pub fn pack_resolve_and_show_preview(
@@ -50,7 +54,7 @@ fn resolve_channel(
         None => (
             branch
                 .as_ref()
-                .map(|b| b.parse_channel(ctx))
+                .map(|b| b.parse_channel(&ctx.config))
                 .transpose()?
                 .flatten(),
             false,
@@ -107,7 +111,7 @@ pub(crate) fn cl_pack(
     // TODO try to get something better from git!
     let version_base = branch
         .as_ref()
-        .map(|b| b.parse_version(&ctx))
+        .map(|b| b.parse_version(&ctx.config))
         .transpose()?
         .flatten();
 
@@ -130,7 +134,7 @@ pub(crate) fn cl_pack(
         }
     }
 
-    release.version = version;
+    release.version = version.clone();
 
     if !inquire::Confirm::new("Continue - write to changelog file?")
         .with_default(true)
@@ -140,8 +144,23 @@ pub(crate) fn cl_pack(
         return Ok(());
     }
 
-    store.create_release(channel, release)?;
+    store.create_release(channel.clone(), release.clone())?;
 
     println!("{}", "Changelog written.".green());
+
+    // YouTrack
+    if youtrack_integration_enabled(&ctx.config, &channel) {
+        if inquire::Confirm::new("Update released issues in YouTrack?")
+            .with_default(true)
+            .prompt()?
+        {
+            youtrack_integration_on_release(&ctx.config, release)?;
+            println!("{}", "YouTrack updated.".green());
+        } else {
+            eprintln!("{}", "YouTrack changes skipped.".yellow());
+            return Ok(());
+        }
+    }
+
     Ok(())
 }

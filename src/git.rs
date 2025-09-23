@@ -1,4 +1,5 @@
 use crate::AppContext;
+use crate::config::Config;
 use crate::utils::empty_to_none::EmptyToNone;
 use anyhow::bail;
 use std::fmt::Display;
@@ -79,8 +80,8 @@ impl BranchName {
     /// Parse version from this branch name.
     ///
     /// Aborts if the configured regex pattern is invalid.
-    pub fn parse_version(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
-        let Some(pat) = ctx.config.branch_version_pattern.as_ref().empty_to_none() else {
+    pub fn parse_version(&self, config: &Config) -> anyhow::Result<Option<String>> {
+        let Some(pat) = config.branch_version_pattern.as_ref().empty_to_none() else {
             return Ok(None);
         };
         self.parse_using_regex(pat, "branch_version_pattern")
@@ -89,16 +90,16 @@ impl BranchName {
     /// Parse issue number from this branch name.
     ///
     /// Aborts if the configured regex pattern is invalid.
-    pub fn parse_issue(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
-        let Some(pat) = ctx.config.branch_issue_pattern.as_ref().empty_to_none() else {
+    pub fn parse_issue(&self, config: &Config) -> anyhow::Result<Option<String>> {
+        let Some(pat) = config.branch_issue_pattern.as_ref().empty_to_none() else {
             return Ok(None);
         };
         self.parse_using_regex(pat, "branch_issue_pattern")
     }
 
     /// Try to detect a release channel from this branch name (e.g. stable, EAP)
-    pub fn parse_channel(&self, ctx: &AppContext) -> anyhow::Result<Option<String>> {
-        for (channel_id, template) in &ctx.config.channels {
+    pub fn parse_channel(&self, config: &Config) -> anyhow::Result<Option<String>> {
+        for (channel_id, template) in &config.channels {
             if template.is_empty() {
                 // Channel only for manual choosing
                 continue;
@@ -165,14 +166,14 @@ mod test {
 
         assert_eq!(
             BranchName("rel/3.14".to_string())
-                .parse_version(&ctx)
+                .parse_version(&ctx.config)
                 .unwrap(),
             Some("3.14".to_string())
         );
 
         assert_eq!(
             BranchName("rel/foo".to_string())
-                .parse_version(&ctx)
+                .parse_version(&ctx.config)
                 .unwrap(),
             None
         );
@@ -188,21 +189,21 @@ mod test {
 
         assert_eq!(
             BranchName("1234-bober-kurwa".to_string())
-                .parse_issue(&ctx)
+                .parse_issue(&ctx.config)
                 .unwrap(),
             Some("1234".to_string())
         );
 
         assert_eq!(
             BranchName("SW-778-jakie-bydłe-jebane".to_string())
-                .parse_issue(&ctx)
+                .parse_issue(&ctx.config)
                 .unwrap(),
             Some("SW-778".to_string())
         );
 
         assert_eq!(
             BranchName("nie-spierdalaj-mordo".to_string())
-                .parse_issue(&ctx)
+                .parse_issue(&ctx.config)
                 .unwrap(),
             None
         );
@@ -217,20 +218,22 @@ mod test {
         };
 
         assert_eq!(
-            BranchName("main".to_string()).parse_channel(&ctx).unwrap(),
+            BranchName("main".to_string())
+                .parse_channel(&ctx.config)
+                .unwrap(),
             Some("default".to_string())
         );
 
         assert_eq!(
             BranchName("master".to_string())
-                .parse_channel(&ctx)
+                .parse_channel(&ctx.config)
                 .unwrap(),
             Some("default".to_string())
         );
 
         assert_eq!(
             BranchName("my-cool-feature".to_string())
-                .parse_version(&ctx)
+                .parse_version(&ctx.config)
                 .unwrap(),
             None
         );
