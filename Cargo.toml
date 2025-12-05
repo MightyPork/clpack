@@ -21,7 +21,7 @@ indexmap = { version = "2.11", features = ["serde"] }
 inquire = { version = "0.9", features = ["editor"] }
 
 # For integrations
-reqwest = { version = "0.12", features = ["rustls-tls", "blocking"] } #, optional = true
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "blocking"] } #, optional = true
 json_dotpath = "1.1.0"
 dotenv = "0.15.0"
 
